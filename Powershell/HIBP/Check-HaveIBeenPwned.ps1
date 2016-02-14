@@ -1,6 +1,5 @@
 cls;
-$scriptPath = $(Split-Path $MyInvocation.MyCommand.Path)
-$emailsFile = "$scriptPath/emails.txt";
+$emailsFile = "$PSScriptRoot/emails.txt";
 
 $hibpServiceURL = "https://haveibeenpwned.com/api/breachedaccount/";
 
@@ -18,7 +17,6 @@ Get-Content -Path $emailsFile |
             Write-Host "$email - OK!" -ForegroundColor:Green
             #Failure
         }
-
 
         if($r.StatusCode -eq 200)
         {
