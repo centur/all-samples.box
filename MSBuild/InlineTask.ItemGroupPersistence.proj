@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <UsingTask TaskName="SaveItemGroups" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll">
+        <ParameterGroup>
+            <ItemGroupToSave ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" Output="false"/>
+        </ParameterGroup>
+        <Task>
+            <Reference Include="c:\Windows\Microsoft.NET\Framework64\v4.0.30319\Microsoft.Build.Framework.dll" />
+            <Reference Include="c:\Windows\Microsoft.NET\Framework64\v4.0.30319\Microsoft.Build.Tasks.v4.0.dll" />
+            <Reference Include="c:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll" />
+
+            <Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.IO;
+using System.Collections.Generic;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Tasks;
+using Microsoft.Build.Utilities;
+using System.Xml;
+using System.Xml.Serialization;
+
+   public class TaskItemSer 
+   {
+        public string ItemSpec;
+        public List<MetaItem> Metadata;
+    }
+
+    public class MetaItem
+    {
+        public string Key;
+        public string Value;
+    }  
+    
+    public class SaveItemGroups : Microsoft.Build.Utilities.Task {
+          
+ 
+    private Microsoft.Build.Framework.ITaskItem[] _ItemGroupToSave;
+    private bool _Success = true;
+    
+    public virtual bool Success {
+        get { return _Success; }
+        set { _Success = value; }
+    }
+    
+    public virtual Microsoft.Build.Framework.ITaskItem[] ItemGroupToSave {
+        get { return _ItemGroupToSave; }
+        set { _ItemGroupToSave = value; }
+    }
+    
+    public override bool Execute() {
+        try
+        {
+            var output = ConvertToSerializable(this.ItemGroupToSave);
+            SaveToFile(@"ItemGroups.xml", output);
+        } catch (Exception)
+        {
+            _Success=false;
+        }
+        return _Success;
+    }
+
+    private void SaveToFile(string fileName, TaskItemSer[] itemsToSave){
+       var xser = new XmlSerializer(typeof(TaskItemSer[]));
+       using(var sw = new StringWriter())
+       {
+           XmlWriter writer = XmlWriter.Create(sw);
+           xser.Serialize(writer, itemsToSave);
+           var xml = sw.ToString();
+           File.WriteAllText(fileName,xml);
+        }
+    }
+
+    private TaskItemSer[] ConvertToSerializable(ITaskItem[] allInputItems){
+        var output = new List<TaskItemSer>();
+        foreach(var item in allInputItems){
+            var converted = new TaskItemSer{ItemSpec = item.ItemSpec,Metadata = new List<MetaItem>()};
+           foreach(string key in item.MetadataNames)
+           {
+               converted.Metadata.Add(new MetaItem{Key=key,Value = item.GetMetadata(key)});
+           }
+           output.Add(converted);
+        }
+        return output.ToArray();
+    }
+}
+            ]]></Code>
+        </Task>
+    </UsingTask>
+
+
+
+     <UsingTask TaskName="RestoreItemGroup" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll">
+        <ParameterGroup>
+            <RestoredItems ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+        </ParameterGroup>
+        <Task>
+            <Reference Include="c:\Windows\Microsoft.NET\Framework64\v4.0.30319\Microsoft.Build.Framework.dll" />
+            <Reference Include="c:\Windows\Microsoft.NET\Framework64\v4.0.30319\Microsoft.Build.Tasks.v4.0.dll" />
+            <Reference Include="c:\Windows\Microsoft.NET\Framework64\v4.0.30319\System.Xml.dll" />
+
+            <Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.IO;
+using System.Collections;
+using System.Collections.Generic;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Tasks;
+using Microsoft.Build.Utilities;
+using System.Xml;
+using System.Xml.Serialization;
+
+   public class TaskItemSer 
+   {
+        public string ItemSpec;
+        public List<MetaItem> Metadata;
+    }
+
+    public class MetaItem
+    {
+        public string Key;
+        public string Value;
+    }  
+    
+    public class RestoreItemGroup : Microsoft.Build.Utilities.Task {
+          
+ 
+    private Microsoft.Build.Framework.ITaskItem[] _RestoredItems;
+    private bool _Success = true;
+    
+    public virtual bool Success {
+        get { return _Success; }
+        set { _Success = value; }
+    }
+    
+    public virtual Microsoft.Build.Framework.ITaskItem[] RestoredItems {
+        get { return _RestoredItems; }
+        set { _RestoredItems = value; }
+    }
+    
+    public override bool Execute() {
+        try
+        {
+            var data = ReadFromFile(@"ItemGroups.xml");
+            this.RestoredItems = ConvertToItems(data);
+
+        } catch (Exception)
+        {
+            _Success=false;
+        }
+        return _Success;
+    }
+
+    private TaskItemSer[] ReadFromFile( string fileName){
+        var xser = new XmlSerializer(typeof(TaskItemSer[]));
+        using(var filereader = new StreamReader(fileName))
+        {
+            var readItems = (TaskItemSer[])xser.Deserialize(filereader);
+            return readItems;
+        }
+    }
+
+    private ITaskItem[] ConvertToItems(TaskItemSer[] allInputItems){
+        var output = new List<ITaskItem>();
+        foreach(var item in allInputItems){
+            var meta= new Hashtable();
+            foreach(var metaitem in item.Metadata){ meta.Add(metaitem.Key, metaitem.Value);}
+            var converted = new TaskItem (item.ItemSpec, meta);
+            output.Add(converted);
+        }
+        return output.ToArray();
+    }
+}
+  
+            ]]></Code>
+        </Task>
+    </UsingTask>
+
+
+    <PropertyGroup>
+        <Value Condition="$(Value) == ''">5</Value>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <File Include="5">
+            <Value>5a</Value>
+        </File>
+        <File Include="4">
+            <Value>4a</Value>
+        </File>
+        <File Include="3">
+            <Value>3a</Value>
+        </File>
+        <File Include="2">
+            <Value>2a</Value>
+        </File>
+        <File Include="1">
+            <Value>1a</Value>
+        </File>
+    </ItemGroup>
+    
+
+    <Target Name="Recursive" Condition="$(Value) > 0">
+        <PropertyGroup>
+            <Value>$([MSBuild]::Subtract($(Value), 1))</Value>
+        </PropertyGroup>
+
+		<Message Text="Value: $(Value)" Importance="High" />
+
+        <Message Text="File: @(File->'%(Value)')" Importance="High" />
+        <SaveItemGroups ItemGroupToSave="@(File)">
+        </SaveItemGroups>
+
+        <RestoreItemGroup Condition="$(Value) > 2" >
+            <Output ItemName="RestoredItem" TaskParameter="RestoredItems" />
+        </RestoreItemGroup>
+  
+        <Message Text="RestoredList: @(RestoredItem->'%(Value)')" Importance="High" />
+        <MSBuild Projects="$(MSBuildProjectFile)" Targets="Recursive" Properties="Value=$(Value)"/>
+    </Target>
+        
+    <Target Name="Build">
+        <MSBuild Projects="$(MSBuildProjectFile)" Targets="Recursive" Properties="Value=5" />
+    </Target>
+</Project>  
